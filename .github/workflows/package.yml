@@ -31,13 +31,14 @@ jobs:
             cp -R Makefile pkg-descr src "${PLUGIN}/"
             cd "${PLUGIN}"
 
-            VERSION=$(make -V PLUGIN_PKGVERSION)
+            # the master branch of the plugins tree builds "-devel" packages unless told otherwise
+            VERSION=$(make PLUGIN_DEVEL= -V PLUGIN_PKGVERSION)
             if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "v${VERSION}" ]; then
                 echo "tag ${GITHUB_REF_NAME} does not match PLUGIN_VERSION ${VERSION} in the Makefile" >&2
                 exit 1
             fi
 
-            make package PLUGIN_HASH="$(echo "${GITHUB_SHA}" | cut -c1-9)"
+            make package PLUGIN_DEVEL= PLUGIN_HASH="$(echo "${GITHUB_SHA}" | cut -c1-9)"
 
             mkdir -p "${GITHUB_WORKSPACE}/dist"
             cp work/pkg/*.pkg "${GITHUB_WORKSPACE}/dist/"
@@ -45,6 +46,8 @@ jobs:
                 pkg info -F "${PKG}"
                 pkg info -l -F "${PKG}"
                 pkg info -R --raw-format json -F "${PKG}" | grep -E '"(arch|abi)"' || true
+                tar -tvf "${PKG}"
+                tar -xOf "${PKG}" +MANIFEST | sed 's/\\n/\n/g' | grep -A40 '"scripts"' | head -60
             done
 
       - name: Upload build artifact
