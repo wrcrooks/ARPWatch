@@ -1,0 +1,61 @@
+name: Package
+
+# Builds the os-arpwatch package in a FreeBSD VM using the OPNsense plugins
+# build system. Pushing a tag like v1.0 also publishes it as a release.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build package in FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: '14'
+          prepare: pkg install -y git
+          run: |
+            set -e
+            git clone --depth 1 https://github.com/opnsense/plugins.git /tmp/plugins
+            PLUGIN=/tmp/plugins/net-mgmt/arpwatch
+            rm -rf "${PLUGIN}"
+            mkdir -p "${PLUGIN}"
+            cp -R Makefile pkg-descr src "${PLUGIN}/"
+            cd "${PLUGIN}"
+
+            VERSION=$(make -V PLUGIN_PKGVERSION)
+            if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "v${VERSION}" ]; then
+                echo "tag ${GITHUB_REF_NAME} does not match PLUGIN_VERSION ${VERSION} in the Makefile" >&2
+                exit 1
+            fi
+
+            make package PLUGIN_HASH="$(echo "${GITHUB_SHA}" | cut -c1-9)"
+
+            mkdir -p "${GITHUB_WORKSPACE}/dist"
+            cp work/pkg/*.pkg "${GITHUB_WORKSPACE}/dist/"
+            for PKG in work/pkg/*.pkg; do
+                pkg info -F "${PKG}"
+                pkg info -l -F "${PKG}"
+                pkg info -R --raw-format json -F "${PKG}" | grep -E '"(arch|abi)"' || true
+            done
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: os-arpwatch
+          path: dist/*.pkg
+          if-no-files-found: error
+
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" dist/*.pkg --title "${GITHUB_REF_NAME}" --generate-notes
