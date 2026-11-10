@@ -27,6 +27,21 @@ talks to other hosts on the same switch is not seen.
 
 ## Installation
 
+### From a release package
+
+Download the package from the
+[releases page](https://github.com/wrcrooks/ARPWatch/releases) and install it
+on the firewall as root (replace the version with the one you want):
+
+```sh
+fetch https://github.com/wrcrooks/ARPWatch/releases/download/v1.0/os-arpwatch-1.0.pkg
+pkg add os-arpwatch-1.0.pkg
+```
+
+The package contains only scripts, so the same file installs on every
+architecture. Remove it again with `pkg delete os-arpwatch`. Since it does not
+come from the OPNsense repository, updates are installed the same way, by hand.
+
 ### Quick install from a checkout
 
 Copy this repository to the firewall and run, as root:
@@ -36,7 +51,7 @@ sh install.sh          # install or update
 sh install.sh remove   # uninstall
 ```
 
-### As a package
+### Building the package yourself
 
 Build it inside the OPNsense plugins tree:
 
@@ -44,9 +59,24 @@ Build it inside the OPNsense plugins tree:
 opnsense-code plugins
 cp -R /path/to/this/repo /usr/plugins/net-mgmt/arpwatch
 cd /usr/plugins/net-mgmt/arpwatch
-make package           # result in work/pkg/os-arpwatch-*.pkg
+make package PLUGIN_DEVEL=   # result in work/pkg/os-arpwatch-*.pkg
 pkg add work/pkg/os-arpwatch-*.pkg
 ```
+
+## Releasing
+
+The `Package` workflow builds the package in a FreeBSD VM on GitHub Actions.
+To publish a release, set `PLUGIN_VERSION` in the `Makefile`, add the changes
+to `pkg-descr`, commit, then push a matching tag:
+
+```sh
+git tag v1.0
+git push origin v1.0
+```
+
+The workflow refuses a tag that does not match `PLUGIN_VERSION`. It can also be
+started by hand from the Actions tab, which builds the package and keeps it as
+a workflow artifact without publishing a release.
 
 ## Configuration
 
