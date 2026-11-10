@@ -1,0 +1,94 @@
+<form>
+    <field>
+        <label>Email (SMTP)</label>
+        <type>header</type>
+    </field>
+    <field>
+        <id>arpwatch.notifications.smtp_enabled</id>
+        <label>Enable</label>
+        <type>checkbox</type>
+    </field>
+    <field>
+        <id>arpwatch.notifications.smtp_host</id>
+        <label>Mail server</label>
+        <type>text</type>
+        <help>Hostname or IP address of the SMTP server.</help>
+    </field>
+    <field>
+        <id>arpwatch.notifications.smtp_port</id>
+        <label>Port</label>
+        <type>text</type>
+        <help>Usually 587 for STARTTLS, 465 for SSL/TLS and 25 for unencrypted relays.</help>
+    </field>
+    <field>
+        <id>arpwatch.notifications.smtp_security</id>
+        <label>Connection security</label>
+        <type>dropdown</type>
+    </field>
+    <field>
+        <id>arpwatch.notifications.smtp_username</id>
+        <label>Username</label>
+        <type>text</type>
+        <help>Leave empty when the server does not require authentication.</help>
+    </field>
+    <field>
+        <id>arpwatch.notifications.smtp_password</id>
+        <label>Password</label>
+        <type>password</type>
+    </field>
+    <field>
+        <id>arpwatch.notifications.smtp_from</id>
+        <label>From address</label>
+        <type>text</type>
+    </field>
+    <field>
+        <id>arpwatch.notifications.smtp_to</id>
+        <label>Recipients</label>
+        <type>select_multiple</type>
+        <style>tokenize</style>
+        <allownew>true</allownew>
+        <help>One or more email addresses to notify.</help>
+    </field>
+    <field>
+        <label>Telegram</label>
+        <type>header</type>
+    </field>
+    <field>
+        <id>arpwatch.notifications.telegram_enabled</id>
+        <label>Enable</label>
+        <type>checkbox</type>
+    </field>
+    <field>
+        <id>arpwatch.notifications.telegram_token</id>
+        <label>Bot token</label>
+        <type>password</type>
+        <help>Token of your bot, as issued by @BotFather.</help>
+    </field>
+    <field>
+        <id>arpwatch.notifications.telegram_chat_id</id>
+        <label>Chat ID</label>
+        <type>text</type>
+        <help>Numeric id of the chat or group to post to (group ids are negative), or a public @channelname. Send your bot a message first, it cannot start a conversation by itself.</help>
+    </field>
+    <field>
+        <label>Pushbullet</label>
+        <type>header</type>
+    </field>
+    <field>
+        <id>arpwatch.notifications.pushbullet_enabled</id>
+        <label>Enable</label>
+        <type>checkbox</type>
+    </field>
+    <field>
+        <id>arpwatch.notifications.pushbullet_token</id>
+        <label>Access token</label>
+        <type>password</type>
+        <help>Create one under Settings, Account on pushbullet.com.</help>
+    </field>
+    <field>
+        <id>arpwatch.notifications.pushbullet_channel</id>
+        <label>Channel tag</label>
+        <type>text</type>
+        <help>Optional. Push to the subscribers of this channel instead of to all of your own devices.</help>
+    </field>
+</form>

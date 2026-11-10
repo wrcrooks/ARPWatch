@@ -1,0 +1,2 @@
+arpwatchd.conf:/usr/local/etc/arpwatchd.conf
+rc.conf.d:/etc/rc.conf.d/arpwatchd

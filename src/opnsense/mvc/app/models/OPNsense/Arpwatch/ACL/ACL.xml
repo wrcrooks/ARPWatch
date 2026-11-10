@@ -1,0 +1,11 @@
+<acl>
+    <page-services-arpwatch>
+        <name>Services: ARPWatch</name>
+        <patterns>
+            <pattern>ui/arpwatch/*</pattern>
+            <pattern>api/arpwatch/*</pattern>
+            <pattern>ui/diagnostics/log/core/arpwatch*</pattern>
+            <pattern>api/diagnostics/log/core/arpwatch/*</pattern>
+        </patterns>
+    </page-services-arpwatch>
+</acl>

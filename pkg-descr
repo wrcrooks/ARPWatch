@@ -1,0 +1,13 @@
+ARPWatch keeps a database of every MAC address seen in the ARP and IPv6
+neighbour tables of the firewall and sends a notification when a device
+that was never seen before joins the network. Optionally it also reports
+IP addresses that move to another MAC address.
+
+Notifications can be delivered by email (SMTP), Telegram and Pushbullet.
+
+Plugin Changelog
+================
+
+1.0
+
+* Initial release

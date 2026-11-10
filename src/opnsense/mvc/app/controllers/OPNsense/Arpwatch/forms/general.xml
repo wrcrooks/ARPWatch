@@ -1,0 +1,63 @@
+<form>
+    <field>
+        <id>arpwatch.general.enabled</id>
+        <label>Enable</label>
+        <type>checkbox</type>
+        <help>Watch the network for new devices.</help>
+    </field>
+    <field>
+        <id>arpwatch.general.interfaces</id>
+        <label>Interfaces</label>
+        <type>select_multiple</type>
+        <hint>All interfaces</hint>
+        <help>Interfaces to watch. Leave empty to watch every interface. Excluding WAN is usually a good idea, as your provider's equipment would be reported too.</help>
+    </field>
+    <field>
+        <id>arpwatch.general.interval</id>
+        <label>Scan interval</label>
+        <type>text</type>
+        <help>Seconds between two inspections of the ARP and NDP tables.</help>
+    </field>
+    <field>
+        <id>arpwatch.general.ipv6</id>
+        <label>Include IPv6 neighbours</label>
+        <type>checkbox</type>
+        <help>Also inspect the IPv6 neighbour (NDP) table, so IPv6-only devices are detected as well.</help>
+    </field>
+    <field>
+        <id>arpwatch.general.silent_seed</id>
+        <label>Learn silently on first run</label>
+        <type>checkbox</type>
+        <help>When the device database is empty, record the devices found by the first scan without sending notifications. This avoids a flood of alerts for the devices already on your network.</help>
+    </field>
+    <field>
+        <label>Events to report</label>
+        <type>header</type>
+    </field>
+    <field>
+        <id>arpwatch.general.notify_new_mac</id>
+        <label>New device</label>
+        <type>checkbox</type>
+        <help>A MAC address that has never been seen before appeared on the network.</help>
+    </field>
+    <field>
+        <id>arpwatch.general.notify_mac_changed</id>
+        <label>IP address changed MAC</label>
+        <type>checkbox</type>
+        <help>An IP address is now used by a different MAC address than before. This can indicate ARP spoofing, but also happens when a DHCP lease is handed to another device. Reported at most once per hour per address.</help>
+    </field>
+    <field>
+        <id>arpwatch.general.notify_new_ip</id>
+        <label>Known device, new IP address</label>
+        <type>checkbox</type>
+        <help>A known MAC address started using an IP address it did not use before. Noisy on networks using DHCP or IPv6 privacy addresses.</help>
+    </field>
+    <field>
+        <id>arpwatch.general.ignore_macs</id>
+        <label>Ignore MAC addresses</label>
+        <type>select_multiple</type>
+        <style>tokenize</style>
+        <allownew>true</allownew>
+        <help>MAC addresses or prefixes (e.g. 00:11:22) that never trigger a notification. They are still recorded in the device list.</help>
+    </field>
+</form>

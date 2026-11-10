@@ -1,0 +1,8 @@
+<menu>
+    <Services>
+        <Arpwatch VisibleName="ARPWatch" cssClass="fa fa-eye fa-fw">
+            <Settings order="10" url="/ui/arpwatch/"/>
+            <Log VisibleName="Log File" order="20" url="/ui/diagnostics/log/core/arpwatch"/>
+        </Arpwatch>
+    </Services>
+</menu>

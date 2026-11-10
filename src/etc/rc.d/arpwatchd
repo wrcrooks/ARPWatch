@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# PROVIDE: arpwatchd
+# REQUIRE: NETWORKING SERVERS
+# KEYWORD: shutdown
+#
+
+. /etc/rc.subr
+
+name=arpwatchd
+rcvar=arpwatchd_enable
+
+load_rc_config $name
+
+: ${arpwatchd_enable:=NO}
+
+pidfile=/var/run/${name}.pid
+python=/usr/local/bin/python3
+script=/usr/local/opnsense/scripts/OPNsense/Arpwatch/arpwatchd.py
+
+command=/usr/sbin/daemon
+command_args="-f -p ${pidfile} ${python} ${script}"
+procname=${python}
+
+run_rc_command "$1"

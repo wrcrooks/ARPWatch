@@ -1,0 +1,92 @@
+<model>
+    <mount>//OPNsense/arpwatch</mount>
+    <description>ARPWatch new device monitor</description>
+    <version>1.0.0</version>
+    <items>
+        <general>
+            <enabled type="BooleanField">
+                <Default>0</Default>
+                <Required>Y</Required>
+            </enabled>
+            <interfaces type="InterfaceField">
+                <Multiple>Y</Multiple>
+            </interfaces>
+            <interval type="IntegerField">
+                <Default>30</Default>
+                <Required>Y</Required>
+                <MinimumValue>5</MinimumValue>
+                <MaximumValue>3600</MaximumValue>
+                <ValidationMessage>Scan interval must be between 5 and 3600 seconds.</ValidationMessage>
+            </interval>
+            <ipv6 type="BooleanField">
+                <Default>1</Default>
+                <Required>Y</Required>
+            </ipv6>
+            <silent_seed type="BooleanField">
+                <Default>1</Default>
+                <Required>Y</Required>
+            </silent_seed>
+            <notify_new_mac type="BooleanField">
+                <Default>1</Default>
+                <Required>Y</Required>
+            </notify_new_mac>
+            <notify_mac_changed type="BooleanField">
+                <Default>1</Default>
+                <Required>Y</Required>
+            </notify_mac_changed>
+            <notify_new_ip type="BooleanField">
+                <Default>0</Default>
+                <Required>Y</Required>
+            </notify_new_ip>
+            <ignore_macs type="CSVListField"/>
+        </general>
+        <notifications>
+            <smtp_enabled type="BooleanField">
+                <Default>0</Default>
+                <Required>Y</Required>
+            </smtp_enabled>
+            <smtp_host type="HostnameField"/>
+            <smtp_port type="PortField">
+                <Default>587</Default>
+                <Required>Y</Required>
+            </smtp_port>
+            <smtp_security type="OptionField">
+                <Default>starttls</Default>
+                <Required>Y</Required>
+                <OptionValues>
+                    <starttls>STARTTLS</starttls>
+                    <ssl>SSL/TLS</ssl>
+                    <none>None (unencrypted)</none>
+                </OptionValues>
+            </smtp_security>
+            <smtp_username type="TextField"/>
+            <smtp_password type="TextField"/>
+            <smtp_from type="EmailField"/>
+            <smtp_to type="CSVListField"/>
+            <telegram_enabled type="BooleanField">
+                <Default>0</Default>
+                <Required>Y</Required>
+            </telegram_enabled>
+            <telegram_token type="TextField">
+                <Mask>/^[0-9]+:[A-Za-z0-9_-]+$/</Mask>
+                <ValidationMessage>A bot token looks like 123456789:AAExampleTokenFromBotFather.</ValidationMessage>
+            </telegram_token>
+            <telegram_chat_id type="TextField">
+                <Mask>/^(-?[0-9]+|@[A-Za-z0-9_]+)$/</Mask>
+                <ValidationMessage>Use a numeric chat id (negative for groups) or a public @channelname.</ValidationMessage>
+            </telegram_chat_id>
+            <pushbullet_enabled type="BooleanField">
+                <Default>0</Default>
+                <Required>Y</Required>
+            </pushbullet_enabled>
+            <pushbullet_token type="TextField">
+                <Mask>/^[A-Za-z0-9._-]+$/</Mask>
+                <ValidationMessage>Invalid Pushbullet access token.</ValidationMessage>
+            </pushbullet_token>
+            <pushbullet_channel type="TextField">
+                <Mask>/^[A-Za-z0-9_-]+$/</Mask>
+                <ValidationMessage>Invalid channel tag.</ValidationMessage>
+            </pushbullet_channel>
+        </notifications>
+    </items>
+</model>
