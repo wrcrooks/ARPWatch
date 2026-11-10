@@ -8,6 +8,15 @@ Notifications can be delivered by email (SMTP), Telegram and Pushbullet.
 Plugin Changelog
 ================
 
+1.1
+
+* Show hostnames from DHCP static mappings and leases (ISC, Kea, Dnsmasq),
+  falling back to reverse DNS, and keep them up to date
+* Include the hostname in notifications, waiting one scan for it if needed
+* Security: keep passwords and tokens out of the generated configuration file
+* Security: sanitise device supplied hostnames
+* Security: never follow HTTP redirects when sending notifications
+
 1.0
 
 * Initial release

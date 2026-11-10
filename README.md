@@ -21,6 +21,21 @@ Events found in the same scan are combined into one message. Failed deliveries
 are retried up to five times with increasing delays. On the very first run the
 devices already present are learned without notifications.
 
+### Hostnames
+
+Wherever a name can be found it is shown next to the MAC and IP address: on
+the Devices tab, in notifications and in the log. Sources, in order of
+preference:
+
+1. static DHCP mappings (ISC DHCP, Kea, Dnsmasq),
+2. current DHCP leases of those services,
+3. reverse DNS.
+
+Names are refreshed on every scan, so a device that was first seen without a
+name picks one up later. A new device often registers its name a moment after
+it first appears, so a notification without a hostname is held back for one
+scan interval to give the name a chance to show up; it is then sent either way.
+
 Because it reads the firewall's own neighbour tables, a device is detected once
 it exchanges traffic with the firewall (DHCP, DNS, gateway). A device that only
 talks to other hosts on the same switch is not seen.
@@ -34,9 +49,12 @@ Download the package from the
 on the firewall as root (replace the version with the one you want):
 
 ```sh
-fetch https://github.com/wrcrooks/ARPWatch/releases/download/v1.0/os-arpwatch-1.0.pkg
-pkg add os-arpwatch-1.0.pkg
+fetch https://github.com/wrcrooks/ARPWatch/releases/download/v1.1/os-arpwatch-1.1.pkg
+pkg add os-arpwatch-1.1.pkg
 ```
+
+To update, remove the installed version first with `pkg delete os-arpwatch`,
+then add the new file. Settings and the device database are kept.
 
 The package contains only scripts, so the same file installs on every
 architecture. Remove it again with `pkg delete os-arpwatch`. Since it does not
@@ -70,8 +88,8 @@ To publish a release, set `PLUGIN_VERSION` in the `Makefile`, add the changes
 to `pkg-descr`, commit, then push a matching tag:
 
 ```sh
-git tag v1.0
-git push origin v1.0
+git tag v1.1
+git push origin v1.1
 ```
 
 The workflow refuses a tag that does not match `PLUGIN_VERSION`. It can also be
@@ -102,8 +120,12 @@ Activity is logged under **Services > ARPWatch > Log File**.
 
 ## Notes
 
-* Credentials are stored in `config.xml` like any other OPNsense setting, and
-  in `/usr/local/etc/arpwatchd.conf` (mode 0600).
+* Credentials are stored in `config.xml` like any other OPNsense setting and
+  nowhere else. Like other settings they are visible to every administrator
+  who may open the ARPWatch page.
+* Hostnames are supplied by the devices themselves and can be chosen freely by
+  them. They are reduced to letters, digits, dots, dashes and underscores, but
+  should not be trusted as an identity.
 * Phones and laptops using randomised ("private") MAC addresses appear as a new
   device per network, and again whenever they rotate the address. They are
   labelled as such in the notification.

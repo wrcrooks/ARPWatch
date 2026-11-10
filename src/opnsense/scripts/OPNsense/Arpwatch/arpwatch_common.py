@@ -5,6 +5,8 @@
     SPDX-License-Identifier: BSD-2-Clause
 """
 import configparser
+import csv
+import ipaddress
 import json
 import os
 import re
@@ -17,11 +19,17 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import xml.etree.ElementTree as ElementTree
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid
 
 CONFIG_FILE = '/usr/local/etc/arpwatchd.conf'
+CONFIG_XML = '/conf/config.xml'
 DB_FILE = '/var/db/arpwatch/arpwatch.db'
+LEASES_ISC = '/var/dhcpd/var/db/dhcpd.leases'
+LEASES_KEA = ('/var/db/kea/kea-leases4.csv', '/var/db/kea/kea-leases6.csv')
+LEASES_DNSMASQ = '/var/db/dnsmasq.leases'
+MAX_LEASE_FILE = 32 * 1024 * 1024
 HTTP_TIMEOUT = 20
 
 EVENT_TITLES = {
@@ -34,21 +42,41 @@ EVENT_TITLES = {
 # --------------------------------------------------------------------------
 # configuration
 # --------------------------------------------------------------------------
-class Config:
-    """ thin wrapper around the ini file rendered by the configd template """
+def read_config_xml(path=CONFIG_XML):
+    """ parse the system configuration, returns None when unavailable """
+    try:
+        return ElementTree.parse(path).getroot()
+    except (OSError, ElementTree.ParseError):
+        return None
 
-    def __init__(self, path=CONFIG_FILE):
+
+class Config:
+    """
+        Settings as rendered by the configd template. Credentials are deliberately not part of that
+        file, since generated files are world readable. They are read from the system configuration
+        (root only) instead.
+    """
+    SECRETS = {
+        ('smtp', 'password'): 'smtp_password',
+        ('telegram', 'token'): 'telegram_token',
+        ('pushbullet', 'token'): 'pushbullet_token',
+    }
+
+    def __init__(self, path=CONFIG_FILE, xml_path=CONFIG_XML):
         self._cp = configparser.RawConfigParser(interpolation=None, strict=False)
         self._cp.optionxform = str
         if os.path.isfile(path):
-            try:
-                # the file holds credentials, keep it away from other users
-                os.chmod(path, 0o600)
-            except OSError:
-                pass
             self._cp.read(path, encoding='utf-8')
+        self._secrets = {}
+        root = read_config_xml(xml_path)
+        node = root.find('OPNsense/arpwatch/notifications') if root is not None else None
+        if node is not None:
+            for key, tag in self.SECRETS.items():
+                self._secrets[key] = (node.findtext(tag) or '').strip()
 
     def get(self, section, option, default=''):
+        if (section, option) in self.SECRETS:
+            return self._secrets.get((section, option)) or default
         try:
             return self._cp.get(section, option).strip()
         except (configparser.NoSectionError, configparser.NoOptionError):
@@ -97,6 +125,14 @@ def normalize_mac(mac):
     return ':'.join(p.zfill(2) for p in parts)
 
 
+def valid_ip(address):
+    try:
+        ipaddress.ip_address(address)
+        return True
+    except ValueError:
+        return False
+
+
 def is_unicast(mac):
     return mac != '00:00:00:00:00:00' and not int(mac[:2], 16) & 1
 
@@ -113,7 +149,7 @@ def parse_arp(text):
         if not match or 'permanent' in match.group('rest'):
             continue
         mac = normalize_mac(match.group('mac'))
-        if mac and is_unicast(mac):
+        if mac and is_unicast(mac) and valid_ip(match.group('ip')):
             yield match.group('ip'), mac, match.group('intf')
 
 
@@ -124,8 +160,9 @@ def parse_ndp(text):
         if len(parts) < 4 or parts[3] == 'permanent':
             continue
         mac = normalize_mac(parts[1])
-        if mac and is_unicast(mac):
-            yield parts[0].split('%')[0], mac, parts[2]
+        address = parts[0].split('%')[0]
+        if mac and is_unicast(mac) and valid_ip(address):
+            yield address, mac, parts[2]
 
 
 def _run(cmd):
@@ -140,14 +177,130 @@ def read_neighbours(ipv6=True, run=_run):
     return result
 
 
+def clean_hostname(name):
+    """
+        Hostnames are supplied by the devices themselves (dhcp requests, reverse dns), treat them as
+        hostile: only keep characters that are harmless in the web interface, in logs and in messages.
+    """
+    return re.sub(r'[^A-Za-z0-9._-]', '', str(name or '')).strip('.-')[:253]
+
+
+def clean_text(text):
+    """ strip markup and control characters from descriptive text """
+    return re.sub(r'[<>"\'`\x00-\x1f\x7f]', '', str(text or ''))[:128].strip()
+
+
 def lookup_vendor(mac):
     if is_random_mac(mac):
         return 'randomised / locally administered address'
     try:
         from netaddr import EUI
-        return EUI(mac).oui.registration().org
+        return clean_text(EUI(mac).oui.registration().org)
     except Exception:  # netaddr missing or prefix not registered
         return ''
+
+
+def _read_text(path):
+    """ read a lease file, empty when missing or implausibly large """
+    try:
+        if os.path.getsize(path) > MAX_LEASE_FILE:
+            return ''
+        with open(path, 'r', encoding='utf-8', errors='replace') as handle:
+            return handle.read()
+    except OSError:
+        return ''
+
+
+def parse_isc_leases(text):
+    """ ISC dhcpd leases file, later entries win """
+    result = {}
+    for match in re.finditer(r'^lease\s+\S+\s*\{(.*?)^\}', text, re.S | re.M):
+        mac = re.search(r'hardware ethernet\s+([0-9a-fA-F:]+)\s*;', match.group(1))
+        name = re.search(r'client-hostname\s+"([^"]*)"\s*;', match.group(1))
+        if mac and name:
+            result[mac.group(1)] = name.group(1)
+    return result
+
+
+def parse_kea_leases(text):
+    """ Kea memfile lease database (csv with header), later entries win """
+    result = {}
+    try:
+        for row in csv.DictReader(text.splitlines()):
+            if row.get('hwaddr') and row.get('hostname'):
+                result[row['hwaddr']] = row['hostname']
+    except csv.Error:
+        pass
+    return result
+
+
+def parse_dnsmasq_leases(text):
+    """ dnsmasq leases: expiry, mac, address, hostname, client id """
+    result = {}
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) >= 4 and parts[0].isdigit() and parts[3] != '*':
+            result[parts[1]] = parts[3]
+    return result
+
+
+def static_hostnames(root):
+    """ hostnames of static dhcp mappings (ISC, Kea, dnsmasq) found in the system configuration """
+    result = {}
+    if root is None:
+        return result
+    sources = (
+        ('dhcpd/*/staticmap', 'mac', 'hostname'),
+        ('dhcpdv6/*/staticmap', 'mac', 'hostname'),
+        ('OPNsense/Kea/dhcp4/reservations/reservation', 'hw_address', 'hostname'),
+        ('dnsmasq/hosts', 'hwaddr', 'host'),
+    )
+    for path, mac_tag, name_tag in sources:
+        for node in root.iterfind(path):
+            for mac in re.split(r'[,\s]+', node.findtext(mac_tag) or ''):
+                if mac and node.findtext(name_tag):
+                    result[mac] = node.findtext(name_tag)
+    return result
+
+
+class HostnameDirectory:
+    """
+        Hostnames by mac address as known to the dhcp services on this firewall. Files are only
+        parsed again after they changed.
+    """
+
+    def __init__(self, xml_path=CONFIG_XML, isc=LEASES_ISC, kea=LEASES_KEA, dnsmasq=LEASES_DNSMASQ):
+        # lowest priority first: dynamic leases, then static mappings
+        self._sources = [(isc, lambda p: parse_isc_leases(_read_text(p)))]
+        self._sources += [(path, lambda p: parse_kea_leases(_read_text(p))) for path in kea]
+        self._sources.append((dnsmasq, lambda p: parse_dnsmasq_leases(_read_text(p))))
+        self._sources.append((xml_path, lambda p: static_hostnames(read_config_xml(p))))
+        self._cache = {}
+
+    def _load(self, path, parser):
+        try:
+            stat = os.stat(path)
+        except OSError:
+            self._cache.pop(path, None)
+            return {}
+        stamp = (stat.st_mtime_ns, stat.st_size)
+        if self._cache.get(path, (None, None))[0] != stamp:
+            names = {}
+            try:
+                for mac, name in parser(path).items():
+                    mac, name = normalize_mac(mac), clean_hostname(name)
+                    if mac and name:
+                        names[mac] = name
+            except Exception:  # never let an odd lease file take the daemon down
+                names = {}
+            self._cache[path] = (stamp, names)
+        return self._cache[path][1]
+
+    def by_mac(self):
+        result = {}
+        for path, parser in self._sources:
+            result.update(self._load(path, parser))
+        return result
 
 
 def resolve_hostnames(addresses, timeout=5.0):
@@ -156,8 +309,11 @@ def resolve_hostnames(addresses, timeout=5.0):
 
     def worker(address):
         try:
-            results[address] = socket.gethostbyaddr(address)[0]
-        except OSError:
+            name = clean_hostname(socket.gethostbyaddr(address)[0])
+            # resolvers echo the address back when there is no name
+            if name and not valid_ip(name):
+                results[address] = name
+        except (OSError, UnicodeError):
             pass
 
     threads = [threading.Thread(target=worker, args=(a,), daemon=True) for a in list(addresses)[:64]]
@@ -239,6 +395,9 @@ class Database:
             (vendor or None, hostname or None, mac)
         )
 
+    def hostnames(self):
+        return {r['mac']: r['hostname'] or '' for r in self.conn.execute('select mac, hostname from hosts')}
+
     def commit(self):
         self.conn.commit()
 
@@ -251,9 +410,10 @@ class Database:
             rows.append({
                 'id': row['mac'].replace(':', ''),
                 'mac': row['mac'],
-                'vendor': row['vendor'] or '',
-                'hostname': row['hostname'] or '',
-                'interface': row['interface'] or '',
+                # sanitise on the way out as well, rows may predate input sanitising
+                'vendor': clean_text(row['vendor']),
+                'hostname': clean_hostname(row['hostname']),
+                'interface': clean_text(row['interface']),
                 'addresses': ', '.join(addresses.get(row['mac'], [])),
                 'first_seen': format_time(row['first_seen']),
                 'last_seen': format_time(row['last_seen']),
@@ -302,12 +462,23 @@ def format_notification(events):
     firewall = socket.gethostname()
     if len(events) == 1:
         event = events[0]
+        where = '%s, %s' % (event['ip'], event['hostname']) if event.get('hostname') else event['ip']
         subject = '[%s] ARPWatch: %s %s (%s)' % (
-            firewall, EVENT_TITLES.get(event['type'], event['type']).lower(), event['mac'], event['ip']
+            firewall, EVENT_TITLES.get(event['type'], event['type']).lower(), event['mac'], where
         )
     else:
         subject = '[%s] ARPWatch: %d events' % (firewall, len(events))
     return subject, '\n\n'.join(format_event(e) for e in events)
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """ access tokens travel in the url or headers, never replay them to another location """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
 
 
 def _http_post(url, payload, headers=None):
@@ -318,7 +489,7 @@ def _http_post(url, payload, headers=None):
         method='POST'
     )
     try:
-        with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT) as response:
+        with _OPENER.open(request, timeout=HTTP_TIMEOUT) as response:
             response.read()
     except urllib.error.HTTPError as exc:
         # surface the API's own explanation, never the request url (it may contain a token)

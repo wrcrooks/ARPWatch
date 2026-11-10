@@ -24,6 +24,7 @@
         <id>arpwatch.notifications.smtp_security</id>
         <label>Connection security</label>
         <type>dropdown</type>
+        <help>With "None" the username, password and message travel unencrypted. Only use it for a relay on a network you trust.</help>
     </field>
     <field>
         <id>arpwatch.notifications.smtp_username</id>
